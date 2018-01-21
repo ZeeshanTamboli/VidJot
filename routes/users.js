@@ -1,8 +1,14 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+//const passport= require('passport');
 const router = express.Router();
 
 module.exports = router;
+
+//Load User Model
+require('../models/User');
+const User = mongoose.model('users');
 
 //User Login Route
 router.get('/login', (req, res) => {
@@ -18,15 +24,15 @@ router.get('/register', (req, res) => {
 router.post('/register', (req, res) => {
   let errors = [];
 
-  if(req.body.password != req.body.password2) {
-    errors.push({text: 'Passowords do not match'});
+  if (req.body.password != req.body.password2) {
+    errors.push({ text: 'Passowords do not match' });
   }
 
-  if(req.body.password.length < 4) {
-    errors.push({text: 'Passoword should be atleast 4 characters'});
+  if (req.body.password.length < 4) {
+    errors.push({ text: 'Passoword should be atleast 4 characters' });
   }
 
-  if(errors.length > 0) {
+  if (errors.length > 0) {
     res.render('users/register', {
       errors: errors,
       name: req.body.name,
@@ -35,6 +41,37 @@ router.post('/register', (req, res) => {
       password2: req.body.password2
     });
   } else {
-    res.send('passed');
+    User.findOne({
+      email: req.body.email
+    })
+      .then(user => {
+        if (user) {
+          req.flash('error_msg', 'Email already registered');
+          res.redirect('/users/register');
+        } else {
+          const newUser = {
+            name: req.body.name,
+            email: req.body.email,
+            password: req.body.password
+          }
+
+          bcrypt.genSalt(10, (err, salt) => {
+            bcrypt.hash(newUser.password, salt, (err, hash) => {
+              if (err) throw err;
+              newUser.password = hash;
+              new User(newUser)
+                .save()
+                .then(user => {
+                  req.flash('success_msg', 'You are now registered and can login');
+                  res.redirect('/users/login');
+                })
+                .catch(err => {
+                  console.log(err);
+                  return;
+                });
+            });
+          });
+        }
+      });
   }
 });
